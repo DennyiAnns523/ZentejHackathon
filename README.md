@@ -8,34 +8,56 @@ This system is designed to perform identity verification and forgery detection i
 3. run app.py
 
 # **Technical Implementation Details**
-1. Dependencies and Libraries:
+Dependencies and Libraries:
+   
   a) Deep Learning: PyTorch, Transformers (HuggingFace)
+  
   b) Face Analysis: InsightFace (buffalo_l model)
+  
   c) Image Processing: OpenCV (cv2), PIL
+  
   d) UI Framework: Streamlit
+  
   e) Computer Vision: NumPy, Pandas
+  
   f) Utilities: TQDM for progress tracking
 
-2. Model Loading and Caching
+Model Loading and Caching
+
   a) ViT model weights loaded from fine-tuned checkpoint
+
   b) Models cached using Streamlit @st.cache_resource decorator
+  
   c) GPU/CPU device selection based on availability
+  
   d) Models loaded in evaluation mode for inference
 
-3. Inference Pipeline
+Inference Pipeline
+
   ViT Inference:
+  
   a) Input image resized to 224×224
+  
   b) Normalize using ImageNet statistics
+  
   c) Convert to tensor and move to device
+  
   d) Forward pass through model
+  
   e) Apply softmax for probability distribution
+  
   f) Extract real and fake probabilities
 
   InsightFace Inference:
+  
   a) Convert PIL image to OpenCV format (BGR)
+  
   b) Detect faces using buffalo_l detector
+  
   c) Extract embeddings for detected faces
+  
   d) Compute L2-normalized cosine similarity
+  
   e) Return similarity score
 
 
