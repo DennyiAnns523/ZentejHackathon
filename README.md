@@ -1,13 +1,13 @@
-**Deepfake-Proof eKYC System**
+# Deepfake-Proof eKYC System
 
 This system is designed to perform identity verification and forgery detection in real-time. The system leverages SCRFD for preprocessing, fine-tuned Vision Transformer (ViT) for deepfake detection, and InsightFace for identity verification through face embedding similarity. The solution is deployed as a user-friendly Streamlit web application supporting both static image uploads and live webcam capture.
 
-For testing it on your device:
+# For testing it on your device:
 1. Clone the repository
 2. Install all the required packages
 3. run app.py
 
-**Technical Implementation Details**
+# **Technical Implementation Details**
 1. Dependencies and Libraries:
   a) Deep Learning: PyTorch, Transformers (HuggingFace)
   b) Face Analysis: InsightFace (buffalo_l model)
