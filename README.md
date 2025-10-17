@@ -8,7 +8,7 @@ This system is designed to perform identity verification and forgery detection i
 3. run app.py
 
 # **Technical Implementation Details**
-Dependencies and Libraries:
+------Dependencies and Libraries:------
    
   a) Deep Learning: PyTorch, Transformers (HuggingFace)
   
@@ -22,7 +22,7 @@ Dependencies and Libraries:
   
   f) Utilities: TQDM for progress tracking
 
-Model Loading and Caching
+-------Model Loading and Caching--------
 
   a) ViT model weights loaded from fine-tuned checkpoint
 
@@ -32,7 +32,7 @@ Model Loading and Caching
   
   d) Models loaded in evaluation mode for inference
 
-Inference Pipeline
+------------Inference Pipeline------------
 
   ViT Inference:
   
