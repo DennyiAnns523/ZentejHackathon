@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import torch
 import torch.nn.functional as F
@@ -12,19 +10,19 @@ from insightface.app import FaceAnalysis
 import matplotlib.cm as cm
 
 
+# ===============================
+# 1️⃣ Load Xception Model
+# ===============================
 @st.cache_resource
 def load_xception_model(ckpt_path):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Create model
     model = timm.create_model("xception", pretrained=False, num_classes=2)
 
-    # Load checkpoint
     ckpt = torch.load(ckpt_path, map_location=device)
     if "state_dict" in ckpt:
         ckpt = ckpt["state_dict"]
 
-    # Fix any 2D conv weights (reshape to 4D)
     fixed_ckpt = {}
     for k, v in ckpt.items():
         if isinstance(v, torch.Tensor):
@@ -32,16 +30,14 @@ def load_xception_model(ckpt_path):
                 v = v.unsqueeze(-1).unsqueeze(-1)
             fixed_ckpt[k] = v
 
-    # Remove classifier mismatches
     for key in list(fixed_ckpt.keys()):
         if "fc" in key or "classifier" in key:
             del fixed_ckpt[key]
 
-    # Load weights safely
     missing, unexpected = model.load_state_dict(fixed_ckpt, strict=False)
     print(" Missing keys:", missing)
     print("⚠️ Unexpected keys:", unexpected)
-    print(" Model loaded successfully!\n")
+    print("✅ Model loaded successfully!\n")
 
     model.to(device)
     model.eval()
@@ -57,7 +53,7 @@ def load_xception_model(ckpt_path):
 
 
 # ===============================
-# 2️⃣ Deepfake Prediction (Xception)
+# 2️⃣ Deepfake Prediction
 # ===============================
 def predict_deepfake_xception(img_pil, model, transform, device):
     img_tensor = transform(img_pil).unsqueeze(0).to(device)
@@ -70,16 +66,12 @@ def predict_deepfake_xception(img_pil, model, transform, device):
 
 
 # ===============================
-# 3️⃣ Simple Attention-like Heatmap (using activations)
+# 3️⃣ Generate Heatmap (Optional Visualization)
 # ===============================
 def generate_heatmap(model, img_pil, transform, device):
-    """
-    Generates an activation heatmap using the last convolutional feature map.
-    """
     model.eval()
     img_tensor = transform(img_pil).unsqueeze(0).to(device)
 
-    # Hook to capture last conv activations
     activation = {}
     def hook_fn(module, input, output):
         activation["feat"] = output.detach()
@@ -88,11 +80,10 @@ def generate_heatmap(model, img_pil, transform, device):
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.Conv2d):
             last_conv = module
-    hook_handle = last_conv.register_forward_hook(hook_fn)
 
+    hook_handle = last_conv.register_forward_hook(hook_fn)
     with torch.no_grad():
         _ = model(img_tensor)
-
     hook_handle.remove()
 
     feat = activation["feat"].squeeze(0).mean(0).cpu().numpy()
@@ -135,26 +126,24 @@ def face_similarity(img1, img2, app):
 # ===============================
 # 5️⃣ Streamlit App
 # ===============================
-st.title("Deepfake Detection + Face Verification ")
+st.title("Deepfake Detection + Face Verification")
 
 # Load model and face engine
-MODEL_PATH = "/Users/vikram/Downloads/xception-b5690688.pth"  # ✅ Update this path
+MODEL_PATH = "/Users/vikram/Downloads/xception-b5690688.pth"  # 🔁 Update to your model path
 model, val_transform, device = load_xception_model(MODEL_PATH)
 app = init_insightface()
 
-# Step 1: Upload original image
-st.header("Step 1: Deepfake Detection")
+# Step 1: Upload Original Image
+st.header("Step 1: Deepfake Detection (Original Image)")
 orig_file = st.file_uploader("Upload Original Image", type=["jpg", "png"])
 if orig_file:
     orig_img = Image.open(orig_file).convert("RGB")
     st.image(orig_img, caption="Original Image", use_container_width=True)
 
-    # Deepfake prediction
     probs = predict_deepfake_xception(orig_img, model, val_transform, device)
     st.write(f"Real probability: {probs['real_prob']:.3f}")
     st.write(f"Fake probability: {probs['fake_prob']:.3f}")
 
-    # Visualization
     st.subheader("Feature Activation Heatmap")
     try:
         heatmap_img = generate_heatmap(model, orig_img, val_transform, device)
@@ -163,47 +152,78 @@ if orig_file:
         st.warning(f"⚠️ Heatmap generation failed: {e}")
 
     if probs["fake_prob"] > 0.5:
-        st.error(" Image is likely Fake! Pipeline stopped.")
+        st.error("❌ The uploaded image is likely FAKE. Stopping process.")
     else:
-        st.success("✔️ Image is Real! Proceed to Step 2.")
+        st.success("✅ The uploaded image is REAL. Proceed to Step 2.")
 
         # Step 2: Face Verification
         st.header("Step 2: Face Verification")
-        option = st.radio("Select method for second image:", ("Upload Image", "Capture from Webcam"))
 
+        option = st.radio("Select method for second image:",
+                          ("Upload Image", "Capture from Webcam"))
+
+        # =============== Upload Option ===============
         if option == "Upload Image":
             second_file = st.file_uploader("Upload Second Image", type=["jpg", "png"], key="second")
             if second_file:
                 second_img = Image.open(second_file).convert("RGB")
                 st.image(second_img, caption="Second Image", use_container_width=True)
 
-                sim_score = face_similarity(orig_img, second_img, app)
-                if sim_score is not None:
-                    threshold = 0.7
-                    st.write(f"🔹 Face similarity score: {sim_score:.3f}")
-                    if sim_score > threshold:
-                        st.success("✔️ Faces match! Verification success.")
-                    else:
-                        st.warning("⚠️ Faces do NOT match! Verification failed.")
+                # Deepfake check for 2nd image
+                st.subheader("Checking Deepfake Status (Second Image)")
+                probs2 = predict_deepfake_xception(second_img, model, val_transform, device)
+                st.write(f"Real probability: {probs2['real_prob']:.3f}")
+                st.write(f"Fake probability: {probs2['fake_prob']:.3f}")
 
+                if probs2["fake_prob"] > 0.5:
+                    st.error("❌ The second image is likely FAKE. Verification stopped.")
+                else:
+                    st.success("✅ The second image is REAL. Proceeding to face verification...")
+
+                    sim_score = face_similarity(orig_img, second_img, app)
+                    if sim_score is not None:
+                        threshold = 0.7
+                        st.write(f"🔹 Face similarity score: {sim_score:.3f}")
+                        if sim_score > threshold:
+                            st.success("✔️ Faces match! Verification SUCCESS.")
+                        else:
+                            st.warning("⚠️ Faces do NOT match! Verification FAILED.")
+                    else:
+                        st.error("❌ Could not detect faces in one or both images.")
+
+        # =============== Webcam Option ===============
         else:
             st.info("⚙️ Click 'Capture from Webcam' to take a picture.")
             if st.button("Capture from Webcam"):
                 cap = cv2.VideoCapture(0)
                 ret, frame = cap.read()
                 cap.release()
+
                 if ret:
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     webcam_img = Image.fromarray(frame_rgb)
                     st.image(webcam_img, caption="Captured Image", use_container_width=True)
 
-                    sim_score = face_similarity(orig_img, webcam_img, app)
-                    if sim_score is not None:
-                        threshold = 0.7
-                        st.write(f"🔹 Face similarity score: {sim_score:.3f}")
-                        if sim_score > threshold:
-                            st.success("✔️ Faces match! Verification success.")
+                    # Deepfake check for webcam image
+                    st.subheader("Checking Deepfake Status (Captured Image)")
+                    probs2 = predict_deepfake_xception(webcam_img, model, val_transform, device)
+                    st.write(f"Real probability: {probs2['real_prob']:.3f}")
+                    st.write(f"Fake probability: {probs2['fake_prob']:.3f}")
+
+                    if probs2["fake_prob"] > 0.5:
+                        st.error("❌ The captured image is likely FAKE. Verification stopped.")
+                    else:
+                        st.success("✅ The captured image is REAL. Proceeding to face verification...")
+
+                        sim_score = face_similarity(orig_img, webcam_img, app)
+                        if sim_score is not None:
+                            threshold = 0.7
+                            st.write(f"🔹 Face similarity score: {sim_score:.3f}")
+                            if sim_score > threshold:
+                                st.success("✔️ Faces match! Verification SUCCESS.")
+                            else:
+                                st.warning("⚠️ Faces do NOT match! Verification FAILED.")
                         else:
-                            st.warning("⚠️ Faces do NOT match! Verification failed.")
+                            st.error("❌ Could not detect faces in one or both images.")
                 else:
-                    st.error(" Unable to capture from webcam.")
+                    st.error("❌ Unable to capture from webcam.")
